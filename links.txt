@@ -1,0 +1,4 @@
+https://cran.r-project.org/web/packages/metafor/index.html
+https://cran.r-project.org/web/packages/metafor/metafor.pdf
+https://cran.r-project.org/web/packages/metafor/vignettes/metafor.pdf
+https://cran.r-project.org/web/packages/metafor/vignettes/metafor_diagram.pdf

@@ -1,0 +1,205 @@
+---
+title: "Meta-analysis in R - using the metafor package"
+author: "James Uanhoro"
+output:
+  html_notebook: default
+  html_document: default
+---
+
+## Alternatives to the `metafor` package
+
+The `metafor` package seems to be one of the more comprehensive packages for meta-analysis in _R_. Some commonly used alternatives:
+
+- [meta](https://cran.r-project.org/web/packages/meta/index.html): Supposed to be user-friendly
+- [metaSEM](https://cran.r-project.org/web/packages/metaSEM/index.html): For meta-analysis using structural equation modeling
+<!-- - [robumeta](https://cran.r-project.org/web/packages/robumeta/index.html): Uses robust variance estimation for dealing with dependent effect sizes -->
+- [MAVIS](https://cran.r-project.org/web/packages/MAVIS/index.html): GUI-based comprehensive option for meta-analysis.
+
+```{r, eval = FALSE}
+# How to use the MAVIS package:
+if (!require(MAVIS)) {
+  install.packages("MAVIS", repos = "https://cloud.r-project.org")
+  library(MAVIS)
+}
+startmavis()
+```
+
+Recent journal article on options for meta-analysis in _R_: 
+
+Polanin, J. R., Hennessy, E. A., & Tanner-Smith, E. E. (2017). A Review of Meta-Analysis Packages in R. _Journal of Educational and Behavioral Statistics, 42_(2), 206–242. https://doi.org/10.3102/1076998616674315
+
+## Using `metafor`
+
+Guide to using `metafor`: https://cran.r-project.org/web/packages/metafor/vignettes/metafor_diagram.pdf
+
+1. Read data
+1. Calculate effect size (optional)
+1. Conduct meta-analysis (including _moderation_)
+1. Print results, fitted values, residuals diagnostics, publication bias, inference, plots, ...
+
+## Demo
+
+#### Load required packages
+
+```{r}
+repo <- "https://cloud.r-project.org"
+sapply(c("metafor", "lattice"), function(package_name) {
+  if (!require(package_name, character.only = TRUE)) {
+    install.packages(package_name, repos = repo)
+    library(package_name, character.only = TRUE)
+  }
+})
+```
+
+---
+
+#### Load dataset
+
+```{r}
+data <- dat.bangertdrowns2004
+head(data)
+# Run ?dat.bangertdrowns2004 to see what the dataset represents
+```
+
+---
+
+#### Visualize data
+
+Performed using the `lattice` package
+
+```{r, echo = FALSE}
+xyplot(
+  x ~ Group.1, aggregate(
+    as.numeric(data$id), by = list(data$year), FUN = length
+  ), type = "o", main = "Effect sizes over time", grid = TRUE,
+  xlab = "Year", ylab = "Number of effect sizes"
+)
+histogram(~ grade, data, main = "Effect size distribution by grade")
+histogram(
+  ~ wic + feedback + info + pers + imag + meta,
+  main = "Proportions of possible moderators",
+  scales = list(x = list(at = c(0, 1), labels = c("no", "yes"))),
+  data, layout = c(3, 2)
+)
+densityplot(~ length, data, plot.points = FALSE, auto.key = TRUE)
+densityplot(~ minutes, data, plot.points = FALSE)
+densityplot(~ yi, data, xlab = "Standardized mean difference")
+densityplot(~ ni, data, xlab = "Sample sizes")
+```
+
+---
+
+### Conduct meta-analysis
+
+I will conduct a random-effects meta-analysis. Assuming I wanted to conduct a fixed-effects meta-analysis, I would add `method = FE` as one of the arguments to the `rma` function below. The default method of estimation is `REML`.
+
+The effect size `measure` used below, `yi`, is a standardized mean difference (`SMD`), and the Knapp and Hartung (2003) adjustment is used to improve the estimation of standard errors (`test = "knha"`).
+
+```{r}
+(res.0 <- rma(
+  yi = yi, vi = vi, ni = ni, data = data,
+  measure = "SMD", test = "knha"
+))
+```
+
+The effect of school-based writing-to-learn interventions on academic achievement was 0.2 standard deviations $(SMD = 0.22,95\text{% CI }[0.12, 0.32])$ and this effect was statistically different from zero, $t(47)=4.48,p<.001$.
+
+The result from the Q test for heterogeneity suggests that there was unexplained heterogeneity in the estimate calculated above, $Q(47)=107,p<.001$. Since we performed a random-effects meta-analysis, we modeled this heterogeneity in the $\tau^2$ statistic.
+
+---
+
+We can use the following syntax to obtain the 95% confidence interval around the estimates of heterogeneity.
+
+```{r}
+confint(res.0, level = .95)
+```
+
+The heterogeneity in our estimate was statistically different from zero, $\tau^2=.050,95\text{% CI }[.027, .15]$.
+
+The $I^2$ statistic estimates how much of the total heterogeneity can be attributed to true heterogeneity in the effects, and this was 58.3%, 95% CI [43.9%, 81.1%]. The confidence intervals for heterogeneity estimates are often large.
+
+---
+
+#### Forest plot
+
+We can create a forest plot of the effect sizes in included meta-analysis
+
+```{r, fig.height = 9}
+forest(
+  res.0, slab = paste0(data$author, " (", data$year, ")"),
+  xlim = c(-2.5, 2.5), cex = .75
+)
+op <- par(cex = 1, font = 1)
+text(-2.5, 50, "Author(s) (Year)", pos = 4)
+text(2.9775, 50, "SMD [95% CI]", pos = 2)
+```
+
+We can do a lot more with these forest plots, say separation into subgroups based on moderator variables.
+
+---
+
+#### Moderation analysis
+
+We can check how study characteristics influence average effect calculated earlier. Let's use the `grade` variable as a moderator. By using `factor(grade)`, we specify that `grade` should be treated as a categorical variable.
+
+```{r}
+(res.1 <- rma(
+  yi = yi, vi = vi, ni = ni, data = data,
+  mods = ~ factor(grade),
+  measure = "SMD", test = "knha"
+))
+```
+
+We would interpret the coefficients the same as we would from a regular regression with coefficients as comparisons to the reference group. However, these are interpreted at the effect size level. The `intrcpt` represents the effect at grade 1, with an effect of 0.26 standard deviations, $SMD = 0.26,95\text{% CI }[0.078, 0.45],t(44)=2.85,p=.007$.
+
+The grade 2 coefficient differed significantly from zero, $b=-0.37,t(44)=-2.12,p=.039$. Hence the effect at second grade was -0.11 standard deviations (0.26 - 0.37). Other grade level effects were not statistically different from the grade 1 effect.
+
+We could modify the syntax as below (adding `-1` when defining the moderators), and this would give us coefficients for the specific grade levels.
+
+```{r, eval = FALSE}
+rma(
+  yi = yi, vi = vi, ni = ni, data = data,
+  mods = ~ factor(grade) - 1,
+  measure = "SMD", test = "knha"
+)
+```
+
+This would allow us to tell which coefficients were statistically different from zero, not compared to the reference groups.
+
+There are additional elements from moderation analysis.
+
+```{r}
+res.1
+```
+
+It is important to note that there remained some residual heterogeneity, $Q(44)=102,p<.001$. Additionally, an omnibus test of the moderators suggested that the moderator coefficients were not statistically different from zero, $F(3,44)=1.88,p=.15$.
+
+Additionally, we can observe the change in $\tau^2$, `metafor` uses this to calculate a pseudo-`R^2` and when this value is negative, it reports 0% as above.
+
+All these pieces of evidence suggest that we were unsuccessful at reducing the heterogeneity in our estimates despite adding a moderator.
+
+---
+
+#### Publication bias
+
+We can use something called a funnel plot. If some types of results have been systematically excluded from the meta-analysis, we might see asymmetry about the center in the plot below.
+
+```{r}
+funnel(res.0)
+```
+
+It seems like the plot is light on the left at the lower ends, suggesting some negative results might be missing from our analysis.
+
+We can conduct a test of asymmetry.
+
+```{r}
+regtest(res.0)
+```
+
+Since the asymmetry is statistically different from zero $(t(46)=2.25,p=.029)$, we have a statistical test that suggests we have some amount of asymmetry, hence publication bias (towards positive results based on the funnel plot).
+
+---
+
+## References
+
+- Knapp, G., & Hartung, J. (2003). Improved tests for a random effects meta-regression with a single covariate. _Statistics in Medicine, 22_(17), 2693–2710. https://doi.org/10.1002/sim.1482
