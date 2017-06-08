@@ -31,8 +31,9 @@ xyplot(
 histogram(~ grade, data, main = "Effect size distribution by grade")
 histogram(
   ~ wic + feedback + info + pers + imag + meta,
-  main = "Proportions of possible moderators",
+  main = "Proportions of potential moderators",
   scales = list(x = list(at = c(0, 1), labels = c("no", "yes"))),
+  xlab = "Potential categorical moderators",
   data, layout = c(3, 2)
 )
 densityplot(~ length, data, plot.points = FALSE, auto.key = TRUE)
