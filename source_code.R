@@ -22,24 +22,34 @@ head(data)
 # Run ?dat.bangertdrowns2004 to see what the dataset represents
 
 # Plotting our data
+densityplot(
+  ~ yi, data, xlab = "Standardized mean difference",
+  main = "Density plot of effect sizes"
+)
 xyplot(
   x ~ Group.1, aggregate(
     as.numeric(data$id), by = list(data$year), FUN = length
   ), type = "o", main = "Effect sizes over time", grid = TRUE,
   xlab = "Year", ylab = "Number of effect sizes"
 )
-histogram(~ grade, data, main = "Effect size distribution by grade")
+histogram(
+  ~ grade, data, main = "Effect size distribution by grade",
+  type = "count", ylab = "Number of effect sizes"
+)
 histogram(
   ~ wic + feedback + info + pers + imag + meta,
   main = "Proportions of potential moderators",
   scales = list(x = list(at = c(0, 1), labels = c("no", "yes"))),
   xlab = "Potential categorical moderators",
-  data, layout = c(3, 2)
+  data, layout = c(3, 2), type = "count",
+  ylab = "Number of effect sizes"
+)
+densityplot(
+  ~ ni, data, xlab = "Sample sizes",
+  main = "Density plot of sample sizes"
 )
 densityplot(~ length, data, plot.points = FALSE, auto.key = TRUE)
 densityplot(~ minutes, data, plot.points = FALSE)
-densityplot(~ yi, data, xlab = "Standardized mean difference")
-densityplot(~ ni, data, xlab = "Sample sizes")
 
 # Conduct meta-analysis
 (res.0 <- rma(
